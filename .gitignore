@@ -1,0 +1,8 @@
+# Documentation (keep local only)
+*.docx
+
+# macOS
+.DS_Store
+
+# GAS file tracked separately — remove this line if you want Code.gs in the repo
+# Code.gs
