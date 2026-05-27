@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CE 任務追蹤系統</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="lock-screen" class="lock-screen">
+    <div class="lock-box">
+      <div class="lock-icon">🔒</div>
+      <h2>CE 任務追蹤系統</h2>
+      <p class="lock-hint">請輸入存取密碼</p>
+      <input type="password" id="lock-input" placeholder="密碼" autocomplete="off">
+      <button id="lock-submit">進入</button>
+      <p class="lock-error" id="lock-error"></p>
+    </div>
+  </div>
+
+  <div class="app" id="app" style="display:none;">
+    <header class="header">
+      <div>
+        <h1>CE 任務追蹤系統</h1>
+        <p class="subtitle" id="last-updated">載入中...</p>
+        <p class="subtitle">請大家每天檢查更新任務狀態 → <a href="YOUR_CE_TASK_UPDATE_URL" target="_blank" rel="noopener">點擊進入更新表</a></p>
+      </div>
+      <div class="header-actions">
+        <button id="refresh-btn" class="btn-icon" title="重新整理">⟳</button>
+        <div class="view-toggle" id="view-toggle">
+          <button class="active" data-view="board">看板</button>
+          <button data-view="list">列表</button>
+        </div>
+      </div>
+    </header>
+
+    <section class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">本日到期</div>
+        <div class="kpi-value" id="kpi-today">-</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">本週到期</div>
+        <div class="kpi-value" id="kpi-this-week">-</div>
+      </div>
+      <div class="kpi-card kpi-alert">
+        <div class="kpi-label">逾期任務</div>
+        <div class="kpi-value" id="kpi-overdue">-</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">達成率</div>
+        <div class="kpi-value" id="kpi-completion">-</div>
+      </div>
+    </section>
+
+    <section class="filters">
+      <select id="filter-owner"><option value="">所有負責人</option></select>
+      <select id="filter-type"><option value="">所有類型</option></select>
+      <select id="filter-priority">
+        <option value="">所有優先級</option>
+        <option value="高">高</option>
+        <option value="中">中</option>
+        <option value="低">低</option>
+      </select>
+      <select id="filter-daterange">
+        <option value="">所有時間</option>
+        <option value="overdue">已逾期</option>
+        <option value="today">今日到期</option>
+        <option value="lastWeek">上週</option>
+        <option value="thisWeek">本週</option>
+        <option value="nextWeek">下週</option>
+        <option value="past7">過去 7 天</option>
+        <option value="next7">未來 7 天</option>
+        <option value="next30">未來 30 天</option>
+        <option value="thisMonth">本月</option>
+        <option value="nextMonth">下個月</option>
+      </select>
+      <input type="search" id="filter-search" placeholder="搜尋任務名稱...">
+      <button id="filter-reset" class="btn-secondary">清除篩選</button>
+    </section>
+
+    <main id="main-content">
+      <div class="loading">載入中...</div>
+    </main>
+
+    <footer class="footer">
+      <p>資料來源：Google Sheet · <a id="sheet-link" href="#" target="_blank">開啟 Sheet</a></p>
+    </footer>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
