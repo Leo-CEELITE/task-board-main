@@ -478,6 +478,107 @@ body {
   text-decoration: none;
 }
 
+/* ─── Multi-Select Dropdown ──────────────────────────────────────────────── */
+
+.multi-select {
+  position: relative;
+  display: inline-block;
+}
+
+.ms-trigger {
+  height: 36px;
+  padding: 0 10px 0 12px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  color: #1a1a1a;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.ms-trigger:hover {
+  border-color: #d1d5db;
+  background: #f9fafb;
+}
+
+.ms-trigger.ms-active {
+  border-color: #1a1a2e;
+  background: #f0f0f8;
+  color: #1a1a2e;
+  font-weight: 500;
+}
+
+.ms-label {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ms-caret {
+  font-size: 10px;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.ms-trigger.ms-active .ms-caret {
+  color: #1a1a2e;
+}
+
+.ms-panel {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 160px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  z-index: 200;
+  padding: 6px 0;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.ms-panel.open {
+  display: block;
+}
+
+.ms-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #374151;
+  transition: background 0.1s;
+  user-select: none;
+}
+
+.ms-option:hover {
+  background: #f3f4f6;
+}
+
+.ms-option input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  accent-color: #1a1a2e;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin: 0;
+}
+
+/* ─── Responsive (tag for new type values) ───────────────────────────────── */
+
+.tag-seo { background: #e0f2fe; color: #0369a1; }
+
 @media (max-width: 640px) {
   .app { padding: 16px; }
   .header h1 { font-size: 18px; }

@@ -13,6 +13,8 @@
     'On Hold': 'status-cancel'
   };
 
+  const PRIORITY_OPTIONS = ['高', '中', '低'];
+
   const AUTH_KEY = 'ce_auth_token';
   const AUTH_EXPIRY_DAYS = 7;
 
@@ -20,12 +22,14 @@
     tasks: [],
     summary: null,
     view: 'board',
-    filters: { owner: '', type: '', priority: '', search: '', dueRange: '' },
+    filters: { owner: [], type: [], priority: [], search: '', dueRange: '' },
     sortField: 'dueDay',
     sortDir: 'asc'
   };
 
   const $ = (id) => document.getElementById(id);
+
+  // ─── Auth ─────────────────────────────────────────────────────────────────
 
   function hashPassword(str) {
     let hash = 0;
@@ -104,6 +108,8 @@
     setTimeout(() => $('lock-input').focus(), 100);
   }
 
+  // ─── Utility ──────────────────────────────────────────────────────────────
+
   function getShortStatus(fullStatus) {
     if (!fullStatus) return 'Unknown';
     for (const key of STATUS_ORDER) {
@@ -120,6 +126,8 @@
     if (t.indexOf('external') !== -1) return 'tag-ad-external';
     if (t.indexOf('internal') !== -1) return 'tag-ad-internal';
     if (t.indexOf('incentive') !== -1) return 'tag-ad-incentive';
+    if (t === 'seo') return 'tag-seo';
+    if (t === '廣告' || t.indexOf('ad') !== -1) return 'tag-ad-external';
     return 'tag-default';
   }
 
@@ -153,7 +161,6 @@
     return { text: dueDay.slice(5), cls: 'due-normal', isRelative: false };
   }
 
-  // 以本機時區格式化日期為 yyyy-mm-dd，避免 toISOString() 的 UTC 偏移
   function fmtDate(d) {
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -171,6 +178,8 @@
       .replace(/'/g, '&#39;');
   }
 
+  // ─── Data ─────────────────────────────────────────────────────────────────
+
   async function fetchData() {
     if (!window.CE_CONFIG || !window.CE_CONFIG.API_URL || !window.CE_CONFIG.API_TOKEN) {
       throw new Error('config.js 未正確設定 API_URL 或 API_TOKEN');
@@ -183,56 +192,70 @@
     return data;
   }
 
-  function renderKPIs() {
-    const s = state.summary;
-    if (!s) return;
+  // ─── Multi-Select Helpers ─────────────────────────────────────────────────
 
-    const filtered = applyFilters(state.tasks);
-    const todayStr = s.today;
-
-    const dueTodayCount = filtered.filter(t => {
-      if (!t.dueDay) return false;
-      if (t.status && t.status.indexOf('Done') !== -1) return false;
-      if (t.status && t.status.indexOf('Canceled') !== -1) return false;
-      return t.dueDay === todayStr;
-    }).length;
-    $('kpi-today').textContent = dueTodayCount;
-
-    const overdueCount = filtered.filter(t => {
-      if (!t.dueDay) return false;
-      if (t.status && t.status.indexOf('Done') !== -1) return false;
-      if (t.status && t.status.indexOf('Canceled') !== -1) return false;
-      return t.dueDay < todayStr;
-    }).length;
-    $('kpi-overdue').textContent = overdueCount;
-
-    const doneCount = filtered.filter(t => t.status && t.status.indexOf('Done') !== -1).length;
-    const rate = filtered.length > 0 ? (doneCount / filtered.length * 100) : 0;
-    $('kpi-completion').textContent = rate.toFixed(2) + '%';
-
-    const [weekStartStr, weekEndStr] = getDateRange('thisWeek', s.today);
-    const thisWeek = filtered.filter(t => {
-      if (!t.dueDay) return false;
-      if (t.status && t.status.indexOf('Done') !== -1) return false;
-      return t.dueDay >= weekStartStr && t.dueDay <= weekEndStr;
-    });
-    $('kpi-this-week').textContent = thisWeek.length;
+  function updateMsLabel(msId, selected, placeholder) {
+    const label = document.querySelector('#' + msId + ' .ms-label');
+    if (!label) return;
+    if (selected.length === 0) {
+      label.textContent = placeholder;
+    } else if (selected.length === 1) {
+      label.textContent = selected[0];
+    } else {
+      label.textContent = selected.length + ' 項已選';
+    }
+    const trigger = document.querySelector('#' + msId + ' .ms-trigger');
+    if (trigger) trigger.classList.toggle('ms-active', selected.length > 0);
   }
+
+  function buildMsPanel(msId, items, selected, onChange) {
+    const panel = document.getElementById(msId + '-panel');
+    if (!panel) return;
+    panel.innerHTML = items.map(item =>
+      '<label class="ms-option">' +
+      '<input type="checkbox" value="' + escapeHtml(item) + '"' + (selected.indexOf(item) !== -1 ? ' checked' : '') + '>' +
+      '<span>' + escapeHtml(item) + '</span>' +
+      '</label>'
+    ).join('');
+    panel.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+      cb.addEventListener('change', onChange);
+    });
+  }
+
+  // ─── Filters ──────────────────────────────────────────────────────────────
 
   function renderFilters() {
     const owners = Array.from(new Set(state.tasks.map(t => t.owner).filter(Boolean))).sort();
-    const types = Array.from(new Set(state.tasks.map(t => t.type).filter(Boolean))).sort();
+    const types  = Array.from(new Set(state.tasks.map(t => t.type).filter(Boolean))).sort();
 
-    const ownerSel = $('filter-owner');
-    const typeSel = $('filter-type');
+    buildMsPanel('ms-owner', owners, state.filters.owner, () => {
+      state.filters.owner = Array.from(
+        document.querySelectorAll('#ms-owner-panel input:checked')
+      ).map(cb => cb.value);
+      updateMsLabel('ms-owner', state.filters.owner, '所有負責人');
+      render();
+    });
 
-    const currentOwner = ownerSel.value;
-    const currentType = typeSel.value;
+    buildMsPanel('ms-type', types, state.filters.type, () => {
+      state.filters.type = Array.from(
+        document.querySelectorAll('#ms-type-panel input:checked')
+      ).map(cb => cb.value);
+      updateMsLabel('ms-type', state.filters.type, '所有類型');
+      render();
+    });
 
-    ownerSel.innerHTML = '<option value="">所有負責人</option>' +
-      owners.map(o => `<option value="${escapeHtml(o)}"${o === currentOwner ? ' selected' : ''}>${escapeHtml(o)}</option>`).join('');
-    typeSel.innerHTML = '<option value="">所有類型</option>' +
-      types.map(t => `<option value="${escapeHtml(t)}"${t === currentType ? ' selected' : ''}>${escapeHtml(t)}</option>`).join('');
+    buildMsPanel('ms-priority', PRIORITY_OPTIONS, state.filters.priority, () => {
+      state.filters.priority = Array.from(
+        document.querySelectorAll('#ms-priority-panel input:checked')
+      ).map(cb => cb.value);
+      updateMsLabel('ms-priority', state.filters.priority, '所有優先級');
+      render();
+    });
+
+    // Sync labels with current state (important after data refresh)
+    updateMsLabel('ms-owner',    state.filters.owner,    '所有負責人');
+    updateMsLabel('ms-type',     state.filters.type,     '所有類型');
+    updateMsLabel('ms-priority', state.filters.priority, '所有優先級');
   }
 
   function getDateRange(value, todayStr) {
@@ -249,7 +272,6 @@
       yesterday.setDate(today.getDate() - 1);
       return [fmtDate(start), fmtDate(yesterday)];
     }
-
     if (value === 'lastWeek') {
       const lastMonday = new Date(today);
       lastMonday.setDate(today.getDate() - daysFromMonday - 7);
@@ -257,7 +279,6 @@
       lastSunday.setDate(lastMonday.getDate() + 6);
       return [fmtDate(lastMonday), fmtDate(lastSunday)];
     }
-
     if (value === 'today') {
       return [todayStr, todayStr];
     }
@@ -287,9 +308,9 @@
     const dateRange = getDateRange(state.filters.dueRange, todayStr);
 
     return tasks.filter(t => {
-      if (state.filters.owner && t.owner !== state.filters.owner) return false;
-      if (state.filters.type && t.type !== state.filters.type) return false;
-      if (state.filters.priority && t.priority !== state.filters.priority) return false;
+      if (state.filters.owner.length && state.filters.owner.indexOf(t.owner) === -1) return false;
+      if (state.filters.type.length  && state.filters.type.indexOf(t.type)   === -1) return false;
+      if (state.filters.priority.length && state.filters.priority.indexOf(t.priority) === -1) return false;
       if (state.filters.search) {
         const q = state.filters.search.toLowerCase();
         if (!(t.name || '').toLowerCase().includes(q)) return false;
@@ -307,6 +328,47 @@
     });
   }
 
+  // ─── KPI ──────────────────────────────────────────────────────────────────
+
+  function renderKPIs() {
+    const s = state.summary;
+    if (!s) return;
+
+    const filtered = applyFilters(state.tasks);
+    const todayStr = s.today;
+
+    const dueTodayCount = filtered.filter(t => {
+      if (!t.dueDay) return false;
+      if (t.status && t.status.indexOf('Done') !== -1) return false;
+      if (t.status && t.status.indexOf('Canceled') !== -1) return false;
+      return t.dueDay === todayStr;
+    }).length;
+    $('kpi-today').textContent = dueTodayCount;
+
+    const overdueCount = filtered.filter(t => {
+      if (!t.dueDay) return false;
+      if (t.status && t.status.indexOf('Done') !== -1) return false;
+      if (t.status && t.status.indexOf('Canceled') !== -1) return false;
+      return t.dueDay < todayStr;
+    }).length;
+    $('kpi-overdue').textContent = overdueCount;
+
+    const doneCount = filtered.filter(t => t.status && t.status.indexOf('Done') !== -1).length;
+    const rate = filtered.length > 0 ? (doneCount / filtered.length * 100) : 0;
+    $('kpi-completion').textContent = rate.toFixed(2) + '%';
+
+    const range = getDateRange('thisWeek', s.today);
+    const [weekStartStr, weekEndStr] = range || ['', ''];
+    const thisWeek = filtered.filter(t => {
+      if (!t.dueDay) return false;
+      if (t.status && t.status.indexOf('Done') !== -1) return false;
+      return t.dueDay >= weekStartStr && t.dueDay <= weekEndStr;
+    });
+    $('kpi-this-week').textContent = thisWeek.length;
+  }
+
+  // ─── Board View ───────────────────────────────────────────────────────────
+
   function renderBoard() {
     const filtered = applyFilters(state.tasks);
     const today = state.summary ? state.summary.today : fmtDate(new Date());
@@ -316,7 +378,7 @@
     cols.forEach(c => byCol[c] = []);
 
     filtered.forEach(t => {
-      const isDone = t.status && t.status.indexOf('Done') !== -1;
+      const isDone   = t.status && t.status.indexOf('Done') !== -1;
       const isCancel = t.status && t.status.indexOf('Canceled') !== -1;
       const isOverdue = t.dueDay && !isDone && !isCancel && t.dueDay < today;
 
@@ -338,20 +400,20 @@
 
     const html = cols.map(col => {
       const items = byCol[col];
-      return `<div class="board-column">
-        <div class="board-column-header">
-          <span class="board-column-title">${col}</span>
-          <span class="board-column-count">${items.length}</span>
-        </div>
-        ${items.map(t => renderCard(t, today)).join('')}
-      </div>`;
+      return '<div class="board-column">' +
+        '<div class="board-column-header">' +
+        '<span class="board-column-title">' + col + '</span>' +
+        '<span class="board-column-count">' + items.length + '</span>' +
+        '</div>' +
+        items.map(t => renderCard(t, today)).join('') +
+        '</div>';
     }).join('');
 
     $('main-content').innerHTML = '<div class="board">' + html + '</div>';
   }
 
   function renderCard(t, today) {
-    const due = getDueInfo(t.dueDay, today, t.status);
+    const due    = getDueInfo(t.dueDay, today, t.status);
     const tagCls = getTagClass(t.type);
     const priCls = getPriorityClass(t.priority);
 
@@ -362,32 +424,34 @@
       dateWeekLabel = t.week || '';
     }
 
-    return `<div class="task-card">
-      <div class="task-card-title">
-        <span class="priority-bar ${priCls}"></span>${escapeHtml(t.name)}
-      </div>
-      <div class="task-card-meta">
-        <span class="task-tag ${tagCls}">${escapeHtml(t.type || '其他')}</span>
-        <span class="due-pill ${due.cls}">${due.text}</span>
-      </div>
-      <div class="task-card-meta">
-        <span class="owner-chip">
-          <span class="avatar">${escapeHtml(getInitials(t.owner))}</span>${escapeHtml(t.owner || '未指派')}
-        </span>
-        <span style="font-size:11px; color:#9ca3af;">${escapeHtml(dateWeekLabel)}</span>
-      </div>
-    </div>`;
+    return '<div class="task-card">' +
+      '<div class="task-card-title">' +
+      '<span class="priority-bar ' + priCls + '"></span>' + escapeHtml(t.name) +
+      '</div>' +
+      '<div class="task-card-meta">' +
+      '<span class="task-tag ' + tagCls + '">' + escapeHtml(t.type || '其他') + '</span>' +
+      '<span class="due-pill ' + due.cls + '">' + due.text + '</span>' +
+      '</div>' +
+      '<div class="task-card-meta">' +
+      '<span class="owner-chip">' +
+      '<span class="avatar">' + escapeHtml(getInitials(t.owner)) + '</span>' + escapeHtml(t.owner || '未指派') +
+      '</span>' +
+      '<span style="font-size:11px; color:#9ca3af;">' + escapeHtml(dateWeekLabel) + '</span>' +
+      '</div>' +
+      '</div>';
   }
+
+  // ─── List View ────────────────────────────────────────────────────────────
 
   function renderList() {
     const filtered = applyFilters(state.tasks);
-    const today = state.summary ? state.summary.today : fmtDate(new Date());
+    const today    = state.summary ? state.summary.today : fmtDate(new Date());
 
     const sorted = filtered.slice().sort((a, b) => {
       const field = state.sortField;
-      const dir = state.sortDir === 'asc' ? 1 : -1;
-      const va = (a[field] || '').toString();
-      const vb = (b[field] || '').toString();
+      const dir   = state.sortDir === 'asc' ? 1 : -1;
+      const va    = (a[field] || '').toString();
+      const vb    = (b[field] || '').toString();
       return va < vb ? -1 * dir : va > vb ? 1 * dir : 0;
     });
 
@@ -397,39 +461,36 @@
     }
 
     const rows = sorted.map(t => {
-      const due = getDueInfo(t.dueDay, today, t.status);
-      const tagCls = getTagClass(t.type);
+      const due         = getDueInfo(t.dueDay, today, t.status);
+      const tagCls      = getTagClass(t.type);
       const shortStatus = getShortStatus(t.status);
-      const statusCls = STATUS_CLASS[shortStatus] || 'status-waiting';
-      const priCls = getPriorityClass(t.priority);
+      const statusCls   = STATUS_CLASS[shortStatus] || 'status-waiting';
+      const priCls      = getPriorityClass(t.priority);
 
-      return `<tr>
-        <td>${escapeHtml(t.week || '')}</td>
-        <td><span class="priority-bar ${priCls}"></span>${escapeHtml(t.name)}</td>
-        <td><span class="owner-chip"><span class="avatar">${escapeHtml(getInitials(t.owner))}</span>${escapeHtml(t.owner || '-')}</span></td>
-        <td><span class="task-tag ${tagCls}">${escapeHtml(t.type || '-')}</span></td>
-        <td><span class="status-pill ${statusCls}">${escapeHtml(shortStatus)}</span></td>
-        <td><span class="due-pill ${due.cls}">${escapeHtml(t.dueDay || '-')}</span></td>
-        <td style="font-size:11px; color:#9ca3af;">${escapeHtml(due.text)}</td>
-      </tr>`;
+      return '<tr>' +
+        '<td>' + escapeHtml(t.week || '') + '</td>' +
+        '<td><span class="priority-bar ' + priCls + '"></span>' + escapeHtml(t.name) + '</td>' +
+        '<td><span class="owner-chip"><span class="avatar">' + escapeHtml(getInitials(t.owner)) + '</span>' + escapeHtml(t.owner || '-') + '</span></td>' +
+        '<td><span class="task-tag ' + tagCls + '">' + escapeHtml(t.type || '-') + '</span></td>' +
+        '<td><span class="status-pill ' + statusCls + '">' + escapeHtml(shortStatus) + '</span></td>' +
+        '<td><span class="due-pill ' + due.cls + '">' + escapeHtml(t.dueDay || '-') + '</span></td>' +
+        '<td style="font-size:11px; color:#9ca3af;">' + escapeHtml(due.text) + '</td>' +
+        '</tr>';
     }).join('');
 
-    const html = `<div class="list-view">
-      <table class="list-table">
-        <thead>
-          <tr>
-            <th class="sortable" data-sort="week">週次</th>
-            <th class="sortable" data-sort="name">任務名稱</th>
-            <th class="sortable" data-sort="owner">負責人</th>
-            <th class="sortable" data-sort="type">類型</th>
-            <th class="sortable" data-sort="status">狀態</th>
-            <th class="sortable" data-sort="dueDay">Due Day</th>
-            <th>剩餘</th>
-          </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>`;
+    const html = '<div class="list-view">' +
+      '<table class="list-table">' +
+      '<thead><tr>' +
+      '<th class="sortable" data-sort="week">週次</th>' +
+      '<th class="sortable" data-sort="name">任務名稱</th>' +
+      '<th class="sortable" data-sort="owner">負責人</th>' +
+      '<th class="sortable" data-sort="type">類型</th>' +
+      '<th class="sortable" data-sort="status">狀態</th>' +
+      '<th class="sortable" data-sort="dueDay">Due Day</th>' +
+      '<th>剩餘</th>' +
+      '</tr></thead>' +
+      '<tbody>' + rows + '</tbody>' +
+      '</table></div>';
 
     $('main-content').innerHTML = html;
 
@@ -440,12 +501,14 @@
           state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
         } else {
           state.sortField = field;
-          state.sortDir = 'asc';
+          state.sortDir   = 'asc';
         }
         renderList();
       });
     });
   }
+
+  // ─── Render ───────────────────────────────────────────────────────────────
 
   function render() {
     renderKPIs();
@@ -458,7 +521,7 @@
     btn.classList.add('spinning');
     try {
       const data = await fetchData();
-      state.tasks = data.tasks || [];
+      state.tasks   = data.tasks   || [];
       state.summary = data.summary || null;
       const now = new Date();
       $('last-updated').textContent = '最後更新：' + now.toLocaleString('zh-TW', { hour12: false });
@@ -466,13 +529,16 @@
       render();
     } catch (err) {
       console.error(err);
-      $('main-content').innerHTML = `<div class="error">載入失敗：${escapeHtml(err.message)}<br><br>請檢查 config.js 的 API_URL 和 API_TOKEN 是否正確。</div>`;
+      $('main-content').innerHTML = '<div class="error">載入失敗：' + escapeHtml(err.message) + '<br><br>請檢查 config.js 的 API_URL 和 API_TOKEN 是否正確。</div>';
     } finally {
       btn.classList.remove('spinning');
     }
   }
 
+  // ─── Events ───────────────────────────────────────────────────────────────
+
   function bindEvents() {
+    // View toggle
     document.querySelectorAll('#view-toggle button').forEach(b => {
       b.addEventListener('click', () => {
         document.querySelectorAll('#view-toggle button').forEach(x => x.classList.remove('active'));
@@ -482,19 +548,41 @@
       });
     });
 
-    $('filter-owner').addEventListener('change', e => { state.filters.owner = e.target.value; render(); });
-    $('filter-type').addEventListener('change', e => { state.filters.type = e.target.value; render(); });
-    $('filter-priority').addEventListener('change', e => { state.filters.priority = e.target.value; render(); });
-    $('filter-daterange').addEventListener('change', e => { state.filters.dueRange = e.target.value; render(); });
-    $('filter-search').addEventListener('input', e => { state.filters.search = e.target.value; render(); });
+    // Multi-select: open/close panel on trigger click
+    ['ms-owner', 'ms-type', 'ms-priority'].forEach(id => {
+      const wrapper = $(id);
+      if (!wrapper) return;
+      const trigger = wrapper.querySelector('.ms-trigger');
+      const panel   = wrapper.querySelector('.ms-panel');
+      trigger.addEventListener('click', e => {
+        e.stopPropagation();
+        const isOpen = panel.classList.contains('open');
+        // Close all open panels first
+        document.querySelectorAll('.ms-panel.open').forEach(p => p.classList.remove('open'));
+        if (!isOpen) panel.classList.add('open');
+      });
+      // Prevent clicks inside panel from closing it
+      panel.addEventListener('click', e => e.stopPropagation());
+    });
 
+    // Close all panels on outside click
+    document.addEventListener('click', () => {
+      document.querySelectorAll('.ms-panel.open').forEach(p => p.classList.remove('open'));
+    });
+
+    // Date range & search
+    $('filter-daterange').addEventListener('change', e => { state.filters.dueRange = e.target.value; render(); });
+    $('filter-search').addEventListener('input',    e => { state.filters.search    = e.target.value; render(); });
+
+    // Reset all filters
     $('filter-reset').addEventListener('click', () => {
-      state.filters = { owner: '', type: '', priority: '', search: '', dueRange: '' };
-      $('filter-owner').value = '';
-      $('filter-type').value = '';
-      $('filter-priority').value = '';
+      state.filters = { owner: [], type: [], priority: [], search: '', dueRange: '' };
+      document.querySelectorAll('.ms-panel input[type="checkbox"]').forEach(cb => { cb.checked = false; });
+      updateMsLabel('ms-owner',    [], '所有負責人');
+      updateMsLabel('ms-type',     [], '所有類型');
+      updateMsLabel('ms-priority', [], '所有優先級');
       $('filter-daterange').value = '';
-      $('filter-search').value = '';
+      $('filter-search').value    = '';
       render();
     });
 

@@ -55,14 +55,30 @@
     </section>
 
     <section class="filters">
-      <select id="filter-owner"><option value="">所有負責人</option></select>
-      <select id="filter-type"><option value="">所有類型</option></select>
-      <select id="filter-priority">
-        <option value="">所有優先級</option>
-        <option value="高">高</option>
-        <option value="中">中</option>
-        <option value="低">低</option>
-      </select>
+      <div class="multi-select" id="ms-owner">
+        <button type="button" class="ms-trigger">
+          <span class="ms-label">所有負責人</span>
+          <span class="ms-caret">▾</span>
+        </button>
+        <div class="ms-panel" id="ms-owner-panel"></div>
+      </div>
+
+      <div class="multi-select" id="ms-type">
+        <button type="button" class="ms-trigger">
+          <span class="ms-label">所有類型</span>
+          <span class="ms-caret">▾</span>
+        </button>
+        <div class="ms-panel" id="ms-type-panel"></div>
+      </div>
+
+      <div class="multi-select" id="ms-priority">
+        <button type="button" class="ms-trigger">
+          <span class="ms-label">所有優先級</span>
+          <span class="ms-caret">▾</span>
+        </button>
+        <div class="ms-panel" id="ms-priority-panel"></div>
+      </div>
+
       <select id="filter-daterange">
         <option value="">所有時間</option>
         <option value="overdue">已逾期</option>
